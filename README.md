@@ -14,6 +14,26 @@ This project implements an ETL (Extract, Transform, Load) pipeline for **MARKT-P
 
 ---
 
+## Features
+
+- **Data Extraction**: Connects to MongoDB to extract data from the following collections:
+  - `clients`
+  - `suppliers`
+  - `sonar_runs`
+  - `sonar_results`
+
+- **Data Transformation**: Converts extracted JSON data into pandas DataFrames, normalizing nested structures and cleaning data.
+
+- **Data Loading**: Loads transformed data into a PostgreSQL database with appropriate schema definitions, including:
+  - `clients_table`
+  - `suppliers_table`
+  - `sonar_runs_table`
+  - `sonar_results_table`
+  - `sonar_run_suppliers_table`
+
+- **Error Handling**: Implements error handling during data extraction and database operations.
+
+
 ## Data Description
 
 The project involves four MongoDB collections:
