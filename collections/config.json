@@ -1,0 +1,6 @@
+{
+    "DB_HOST": "localhost",  
+    "DB_NAME": "your dbname", 
+    "DB_USER": "you username",
+    "DB_PASSWORD": "your password"
+}
