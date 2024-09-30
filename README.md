@@ -71,8 +71,6 @@ The data is transformed and loaded into a PostgreSQL database, using the followi
    - `supplier_id` (Foreign Key referencing `suppliers.supplier_id`)
    - `part_number`
    - `price`
-   - `lead_time`
-   - `date`
 
 ---
 
@@ -108,7 +106,7 @@ The data is transformed and loaded into a PostgreSQL database, using the followi
 ### Python Libraries
 - PyMongo
 - Pandas
-- SQLAlchemy or Psycopg2
+- Psycopg2
 - JSON
 
 ### Steps to Run the Pipeline
