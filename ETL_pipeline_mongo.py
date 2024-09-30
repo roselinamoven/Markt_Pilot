@@ -9,41 +9,10 @@ from pymongo.errors import PyMongoError
 
 def main():
 
-    #
-    username = "roselinam"
-    password = "1234"   
-    database_name = "Markt-Pilot"
-    data = extract_data_from_mongodb(username, password, database_name)
-    # if data:
-    # Print extracted data for each collection
-    #  for collection_name, collection_data in data.items():
-    #     print(f"\nData from collection '{collection_name}':")
-    #     print(json.dumps(collection_data, indent=4, default=str))  # Pretty print the JSON data
-
-#  if data:
-#     # Print extracted data for each collection
-#     for collection_name, collection_data in data.items():
-#         print(f"\nData from collection '{collection_name}':")
-#         print(json.dumps(collection_data, indent=4, default=str))  # Pretty print the JSON data
-
-
-#     # Extract data from each collection
-#     for collection_name in collections:
-#         collection = db[collection_name]
-#         data[collection_name] = list(collection.find({}))
-
-#     # Optionally, convert ObjectId to string if needed
-#     for collection_name in data:
-#         for record in data[collection_name]:
-#             if '_id' in record:
-#                 record['_id'] = str(record['_id'])
-
-#     # Save the extracted data to JSON files
-#     for collection_name, records in data.items():
-#         with open(f"{collection_name}.json", "w") as json_file:
-#             json.dump(records, json_file, indent=4)
-
-#     print("Data extracted and saved to JSON files.")  
+    username = "username" #provide your user name
+    password = "password"   #provide your pw
+    database_name = "Markt-Pilot" #provide your database name
+    extract_data_from_mongodb(username, password, database_name)
 
     # Extract
     clients_data, suppliers_data, sonar_runs_data, sonar_results_data = extract_data()
@@ -62,19 +31,8 @@ def main():
         print("No sonar results to load into PostgreSQL.")
  
 
-
-import json
-import os
-
 def extract_data_from_mongodb(username, password, database_name):
-    """
-    Extract data from specified MongoDB collections and return them as dictionaries.
-
-    :param username: MongoDB username
-    :param password: MongoDB password
-    :param database_name: Name of the MongoDB database
-    :return: Dictionary containing collections and their data
-    """
+ 
     mongo_uri = f"mongodb://{username}:{password}@localhost:27017/"
     collections = ['clients', 'suppliers', 'sonar_runs', 'sonar_results']
     extracted_data = {}
@@ -87,7 +45,7 @@ def extract_data_from_mongodb(username, password, database_name):
 
         db = client[database_name]
 
-        # Extract data from each specified collection
+        # Extract data from each collection
         for collection_name in collections:
             collection = db[collection_name]
             extracted_data[collection_name] = list(collection.find({}))  # Convert cursor to list
@@ -155,7 +113,7 @@ def transform_data(clients, suppliers, sonar_runs, sonar_results):
     print(sonar_results_df.head())
     print(sonar_results_df.columns)
 
-    # Ensure that the nested $oid values are flattened into separate columns
+    # nested id values are flattened into separate columns
     if '_id' in sonar_results_df.columns:
         sonar_results_df['_id'] = sonar_results_df['_id']
     if 'part_id' in sonar_results_df.columns:
@@ -295,14 +253,12 @@ def create_tables():
     try:
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS public.sonar_run_suppliers(
-              sonar_run_id VARCHAR,
-              supplier_id VARCHAR,
-                CONSTRAINT unique_sonar_run_suppliers UNIQUE (sonar_run_id, supplier_id),
-                CONSTRAINT sonar_run_ids FOREIGN KEY (sonar_run_id)
-                    REFERENCES public.sonar_runs (sonar_run_id) MATCH SIMPLE
-                    ON UPDATE NO ACTION
-                    ON DELETE NO ACTION
-                    NOT VALID
+            sonar_run_supplier_id SERIAL PRIMARY KEY,
+            sonar_run_id VARCHAR,
+            supplier_id VARCHAR,
+            CONSTRAINT sonar_run_ids FOREIGN KEY (sonar_run_id)
+                REFERENCES public.sonar_runs (sonar_run_id) MATCH SIMPLE,
+            CONSTRAINT unique_sonar_run_supplier UNIQUE (sonar_run_id, supplier_id)  -- Add this unique constraint
         );
         """)
         print("sonar_run_suppliers table created successfully.")
@@ -320,7 +276,9 @@ def create_tables():
             part_id VARCHAR,
             CONSTRAINT sonar_results_pk PRIMARY KEY (sonar_result_id),
             CONSTRAINT sonar_i_fk FOREIGN KEY (sonar_run_id)
-            REFERENCES public.sonar_runs (sonar_run_id) MATCH SIMPLE
+            REFERENCES public.sonar_runs (sonar_run_id) MATCH SIMPLE,
+            CONSTRAINT supply_id_fkey FOREIGN KEY (supplier_id)
+            REFERENCES public.suppliers_table (supplier_id) MATCH SIMPLE           
             ON UPDATE NO ACTION
             ON DELETE NO ACTION
              NOT VALID
@@ -348,10 +306,22 @@ def create_tables():
     conn.close()
 
 # Load data into PostgreSQL
+
 def load_to_postgresql(clients_df, suppliers_df, sonar_runs_df, sonar_results_df):
-    collections_path = 'collections' 
+    # Check for empty DataFrames and print appropriate messages
+    if clients_df.empty:
+        print("Client DataFrame is empty")
+    if suppliers_df.empty:
+        print("Supplier DataFrame is empty")
+    if sonar_runs_df.empty:
+        print("Sonar Runs DataFrame is empty")
+    if sonar_results_df.empty:
+        print("Sonar Results DataFrame is empty")
+
+    collections_path = 'collections'
     config = load_config(os.path.join(collections_path, 'config.json'))
-    
+
+    # Establish database connection
     conn = psycopg2.connect(
         host=config["DB_HOST"],
         database=config["DB_NAME"],
@@ -362,72 +332,68 @@ def load_to_postgresql(clients_df, suppliers_df, sonar_runs_df, sonar_results_df
 
     # Load clients
     for index, row in clients_df.iterrows():
-        cursor.execute(
-            """
-            INSERT INTO public.clients_table (client_id, client_name, contract_start) 
-            VALUES (%s, %s, %s) 
-            ON CONFLICT (client_id) DO NOTHING
-            """,
-            (row['_id'], row['name'], row['contract_start'])
-        )
+        try:
+            cursor.execute(
+                """
+                INSERT INTO public.clients_table (client_id, client_name, contract_start) 
+                VALUES (%s, %s, %s) 
+                ON CONFLICT (client_id) DO NOTHING
+                """,
+                (row['_id'], row['name'], row['contract_start'])
+            )
+        except Exception as e:
+            print(f"Error inserting client for index {index}: {e}")
 
     # Load suppliers
     for index, row in suppliers_df.iterrows():
-        cursor.execute(
-            """
-            INSERT INTO public.suppliers_table (supplier_id, supplier_name, country) 
-            VALUES (%s, %s, %s) 
-            ON CONFLICT (supplier_id) DO NOTHING
-            """,
-            (row['_id'], row['name'], row['country'])
-        )
+        try:
+            cursor.execute(
+                """
+                INSERT INTO public.suppliers_table (supplier_id, supplier_name, country) 
+                VALUES (%s, %s, %s) 
+                ON CONFLICT (supplier_id) DO NOTHING
+                """,
+                (row['_id'], row['name'], row['country'])
+            )
+        except Exception as e:
+            print(f"Error inserting supplier for index {index}: {e}")
 
     # Load sonar runs and handle many-to-many relationship with suppliers
-    print("Contents of supplier_ids column:")
-    print(sonar_runs_df['supplier_ids'].head())
-    # Loop through each sonar run
     for index, row in sonar_runs_df.iterrows():
-     
-    # Extract supplier IDs from the row
-     supplier_ids = row['supplier_ids']  # Assuming supplier_ids is a list in the DataFrame
-     sonar_id=row['_id']
-     print(sonar_id)
-    
-     if isinstance(supplier_ids, list):
-        supplier_id_entry = supplier_ids  # Create a list of supplier IDs
-     else:
-        supplier_id_entry = []  
-
-    # Insert sonar run into the sonar_runs table
-     try:
+        supplier_ids = row['supplier_ids'] if isinstance(row['supplier_ids'], list) else []
+        sonar_id = row['_id']
+        
+        # Insert sonar run into the sonar_runs table
+        try:
             cursor.execute(
                 """
                 INSERT INTO public.sonar_runs (sonar_run_id, status, date, client_id)
                 VALUES (%s, %s, %s, %s)
                 ON CONFLICT (sonar_run_id) DO NOTHING
                 """,
-                (row['_id'], row['status'], row['date'], row['client_id'])
+                (sonar_id, row['status'], row['date'], row['client_id'])
             )
-            print(f"Inserted sonar run with ID {row['_id']}")
-     except Exception as e:
+            print(f"Inserted sonar run with ID {sonar_id}")
+        except Exception as e:
             print(f"Error inserting sonar run for index {index}: {e}")
-    
-    # Insert the relationship between sonar run and each supplier
-     try:
-        for supplier_id in supplier_id_entry:
-            cursor.execute(
-                """
-                INSERT INTO public.sonar_run_suppliers (sonar_run_id, supplier_id)
-                VALUES (%s, %s)
-                ON CONFLICT (sonar_run_id, supplier_id) DO NOTHING
-                """,
-                (row['_id'], supplier_id)
-            )
-        #print(f"Inserted relationship for sonar run ID {row['_id']} and supplier ID {supplier_id}")  
-     except Exception as e:
-        print(f"Error inserting supplier relationships for sonar run ID {row['_id']}: {e}")
+            continue  # Skip to the next iteration
 
- # Load sonar results
+        # Insert the relationship between sonar run and each supplier
+        for supplier_id in supplier_ids:
+            try:
+                cursor.execute(
+                    """
+                    INSERT INTO public.sonar_run_suppliers (sonar_run_id, supplier_id)
+                    VALUES (%s, %s)
+                    ON CONFLICT (sonar_run_id, supplier_id) DO NOTHING
+                    """,
+                    (sonar_id, supplier_id)
+                )
+                print(f"Inserted relationship for sonar run ID {sonar_id} and supplier ID {supplier_id}")
+            except Exception as e:
+                print(f"Error inserting supplier relationships for sonar run ID {sonar_id}: {e}")
+
+    # Load sonar results
     for index, row in sonar_results_df.iterrows():
         # Ensure the sonar_run_id and supplier_id exist before insertion
         cursor.execute("SELECT COUNT(*) FROM public.sonar_runs WHERE sonar_run_id = %s", (row['sonar_run_id'],))
@@ -437,22 +403,25 @@ def load_to_postgresql(clients_df, suppliers_df, sonar_runs_df, sonar_results_df
         supplier_count = cursor.fetchone()[0]
         
         if sonar_run_count > 0 and supplier_count > 0:  # Check if both IDs exist
-            cursor.execute(
-                """
-                INSERT INTO public.sonar_results (sonar_result_id, sonar_run_id, supplier_id, price_norm, part_id)
-                VALUES (%s, %s, %s, %s, %s)
-                ON CONFLICT (sonar_result_id) DO NOTHING
-                """,
-                (
-                    row['_id'],          
-                    row['sonar_run_id'],    
-                    row['supplier_id'],    
-                    row['price_norm'],     
-                    row['part_id']      
+            try:
+                cursor.execute(
+                    """
+                    INSERT INTO public.sonar_results (sonar_result_id, sonar_run_id, supplier_id, price_norm, part_id)
+                    VALUES (%s, %s, %s, %s, %s)
+                    ON CONFLICT (sonar_result_id) DO NOTHING
+                    """,
+                    (
+                        row['_id'],
+                        row['sonar_run_id'],
+                        row['supplier_id'],
+                        row['price_norm'],
+                        row['part_id']
+                    )
                 )
-            )
+            except Exception as e:
+                print(f"Error inserting sonar result for index {index}: {e}")
 
-    #Commit changes and close the cursor and connection
+    # Commit changes and close the cursor and connection
     conn.commit()
     cursor.close()
     conn.close()
