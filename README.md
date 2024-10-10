@@ -17,11 +17,7 @@ This project implements an ETL (Extract, Transform, Load) pipeline for **MARKT-P
 ## Features
 
 - **Data Extraction**: Connects to MongoDB to extract data from the following collections:
-<<<<<<< HEAD
-  - `clients`
-=======
   - `clients` 
->>>>>>> fa615f6 (Added README.md)
   - `suppliers`
   - `sonar_runs`
   - `sonar_results`
