@@ -73,7 +73,7 @@ The data is transformed and loaded into a PostgreSQL database, using the followi
 1. **Clients Table**
    - `client_id` (Primary Key)
    - `client_name`
-   - `location`
+   - `country`
 
 2. **Suppliers Table**
    - `supplier_id` (Primary Key)
@@ -134,8 +134,13 @@ The data is transformed and loaded into a PostgreSQL database, using the followi
 - JSON
 
 ### Steps to Run the Pipeline
-
-1. **Clone the repository**:
+1. **Replace Username,Password and Database Name**:
+-replace the username and password in the config.json file to the actual username and pasword
+-replace database name with your database name 
+2. **Replace Username,Password and Database Name in Mongodb connection string**:
+-replace the username and password in the mongodb connection string to the actual username and pasword
+-replace database name with your database name 
+3. **Clone the repository**:
    ```bash
    git clone <repository_url>
    cd <project_directory>
